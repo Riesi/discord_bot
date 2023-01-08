@@ -14,25 +14,30 @@ use serenity::prelude::*;
 use serenity::framework::standard::macros::{command, hook, help, group};
 use serenity::model::channel::AttachmentType::Bytes;
 use serenity::model::id::UserId;
+use serenity::model::prelude::GuildId;
 use songbird::SerenityInit;
+use songbird::tracks::TrackHandle;
 
 mod bot_utils;
 mod latex_utils;
 
 struct ShardManagerContainer;
-
 impl TypeMapKey for ShardManagerContainer {
     type Value = Arc<Mutex<ShardManager>>;
 }
 
 struct CommandCounter;
-
 impl TypeMapKey for CommandCounter {
     type Value = HashMap<String, u64>;
 }
 
+struct Player;
+impl TypeMapKey for Player {
+    type Value = HashMap<String, TrackHandle>;
+}
+
 #[group]
-#[commands(latency, tex, math, deafen, join, leave, mute, play, undeafen, unmute, sb)]
+#[commands(latency, tex, math, deafen, join, leave, mute, play, undeafen, unmute, sb, stop, resume, pause)]
 struct General;
 
 #[group]
@@ -107,6 +112,7 @@ async fn main() {
                 .framework(framework)
                 .register_songbird()
                 .type_map_insert::<CommandCounter>(HashMap::default())
+                .type_map_insert::<Player>(HashMap::default())
                 .await.expect("Err creating client");
         {
             let mut data = client.data.write().await;
@@ -374,12 +380,79 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
                 return Ok(());
             },
         };
-
-        handler.play_source(source);
+        let track_handler = handler.play_source(source);
+        let mut data = ctx.data.write().await;
+        let players = data.get_mut::<Player>().expect("Expected Player in TypeMap.");
+        let handle_map = players.insert(guild_id.to_string(),track_handler);
 
         check_msg(msg.channel_id.say(&ctx.http, "Playing song").await);
     } else {
         check_msg(msg.channel_id.say(&ctx.http, "Not in a voice channel to play in").await);
+    }
+
+    Ok(())
+}
+
+#[command]
+#[only_in(guilds)]
+async fn stop(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let guild = msg.guild(&ctx.cache).unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx).await
+        .expect("Songbird Voice client placed in at initialisation.").clone();
+
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let mut data = ctx.data.write().await;
+        let mut players = data.get_mut::<Player>().expect("Expected Player in TypeMap.");
+        if let Some(track_handler) = players.remove(&guild_id.to_string()){
+            track_handler.stop().expect("Can not stop!");
+            check_msg(msg.channel_id.say(&ctx.http, "Stopping song").await);
+        }else{
+            check_msg(msg.channel_id.say(&ctx.http, "No song to stop").await);
+        }
+    } else {
+        check_msg(msg.channel_id.say(&ctx.http, "Not in a voice channel to stop").await);
+    }
+
+    Ok(())
+}
+
+#[command]
+#[only_in(guilds)]
+async fn pause(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let guild = msg.guild(&ctx.cache).unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx).await
+        .expect("Songbird Voice client placed in at initialisation.").clone();
+
+    let mut data = ctx.data.read().await;
+    let players = data.get::<Player>().expect("Expected Player in TypeMap.");
+    if let Some(track_handler) = players.get(&guild_id.to_string()){
+        track_handler.pause().expect("Can not pause!");
+    }else{
+        check_msg(msg.channel_id.say(&ctx.http, "No song to pause").await);
+    }
+
+    Ok(())
+}
+
+#[command]
+#[only_in(guilds)]
+async fn resume(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let guild = msg.guild(&ctx.cache).unwrap();
+    let guild_id = guild.id;
+
+    let manager = songbird::get(ctx).await
+        .expect("Songbird Voice client placed in at initialisation.").clone();
+
+    let mut data = ctx.data.read().await;
+    let players = data.get::<Player>().expect("Expected Player in TypeMap.");
+    if let Some(track_handler) = players.get(&guild_id.to_string()){
+        track_handler.play().expect("Can not resume!");
+    }else{
+        check_msg(msg.channel_id.say(&ctx.http, "No song to resume").await);
     }
 
     Ok(())

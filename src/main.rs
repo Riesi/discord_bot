@@ -18,6 +18,7 @@ mod latex_utils;
 mod commands;
 
 use commands::audio::Player;
+use crate::bot_utils::BotConfig;
 use crate::commands::general::ShardManagerContainer;
 
 struct CommandCounter;
@@ -38,69 +39,73 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     if let Ok(cred) = bot_utils::read_credentials(){
-        let http = Http::new(&cred.token);
+        if let Ok(cfg) = bot_utils::read_config(){
+            let http = Http::new(&cred.token);
+            // We will fetch your bot's owners and id
+            let (owners, bot_id) = match http.get_current_application_info().await {
+                Ok(info) => {
+                    let mut owners = HashSet::new();
+                    if let Some(team) = info.team {
+                        owners.insert(team.owner_user_id);
+                    } else {
+                        owners.insert(info.owner.id);
+                    }
+                    match http.get_current_user().await {
+                        Ok(bot_id) => (owners, bot_id.id),
+                        Err(why) => panic!("Could not access the bot id: {:?}", why),
+                    }
+                },
+                Err(why) => panic!("Could not access application info: {:?}", why),
+            };
 
-        // We will fetch your bot's owners and id
-        let (owners, bot_id) = match http.get_current_application_info().await {
-            Ok(info) => {
-                let mut owners = HashSet::new();
-                if let Some(team) = info.team {
-                    owners.insert(team.owner_user_id);
-                } else {
-                    owners.insert(info.owner.id);
-                }
-                match http.get_current_user().await {
-                    Ok(bot_id) => (owners, bot_id.id),
-                    Err(why) => panic!("Could not access the bot id: {:?}", why),
-                }
-            },
-            Err(why) => panic!("Could not access application info: {:?}", why),
-        };
+            let framework = StandardFramework::new()
+                .configure(|c| c
+                           .with_whitespace(true)
+                           .on_mention(Some(bot_id))
+                           .prefix("!")
+                           .delimiters(vec![", ", ","])
+                           .owners(owners))
+                .before(before) //before command execution
+                .after(after) //after command execution
+                .unrecognised_command(unknown_command)
+                .on_dispatch_error(dispatch_error)
+                .bucket("emoji", |b| b.delay(5)).await
+                .bucket("complicated", |b| b.limit(2).time_span(30).delay(5)
+                .limit_for(LimitedFor::Channel)
+                .await_ratelimits(1)
+                .delay_action(delay_action)).await
+                .help(&MY_HELP)
+                .group(&commands::general::GENERAL_GROUP)
+                .group(&commands::latex::LATEX_GROUP)
+                .group(&commands::audio::AUDIO_GROUP)
+                .group(&commands::audio::music::MUSIC_GROUP)
+                .group(&commands::audio::soundboard::SOUNDBOARD_GROUP)
+                .group(&commands::owner::OWNER_GROUP);
 
-        let framework = StandardFramework::new()
-            .configure(|c| c
-                       .with_whitespace(true)
-                       .on_mention(Some(bot_id))
-                       .prefix("!")
-                       .delimiters(vec![", ", ","])
-                       .owners(owners))
-            .before(before) //before command execution
-            .after(after) //after command execution
-            .unrecognised_command(unknown_command)
-            .on_dispatch_error(dispatch_error)
-            .bucket("emoji", |b| b.delay(5)).await
-            .bucket("complicated", |b| b.limit(2).time_span(30).delay(5)
-            .limit_for(LimitedFor::Channel)
-            .await_ratelimits(1)
-            .delay_action(delay_action)).await
-            .help(&MY_HELP)
-            .group(&commands::general::GENERAL_GROUP)
-            .group(&commands::latex::LATEX_GROUP)
-            .group(&commands::audio::AUDIO_GROUP)
-            .group(&commands::audio::music::MUSIC_GROUP)
-            .group(&commands::audio::soundboard::SOUNDBOARD_GROUP)
-            .group(&commands::owner::OWNER_GROUP);
+            let intents = GatewayIntents::non_privileged()
+                | GatewayIntents::GUILD_MESSAGES
+                | GatewayIntents::DIRECT_MESSAGES
+                | GatewayIntents::MESSAGE_CONTENT;
 
-        let intents = GatewayIntents::non_privileged()
-            | GatewayIntents::GUILD_MESSAGES
-            | GatewayIntents::DIRECT_MESSAGES
-            | GatewayIntents::MESSAGE_CONTENT;
+            let mut client =
+                Client::builder(&cred.token, intents)
+                    .event_handler(Handler)
+                    .framework(framework)
+                    .register_songbird()
+                    .type_map_insert::<CommandCounter>(HashMap::default())
+                    .type_map_insert::<Player>(HashMap::default())
+                    .type_map_insert::<BotConfig>(Arc::new(RwLock::new(cfg)))
+                    .await.expect("Err creating client");
+            {
+                let mut data = client.data.write().await;
+                data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
+            }
 
-        let mut client =
-            Client::builder(&cred.token, intents)
-                .event_handler(Handler)
-                .framework(framework)
-                .register_songbird()
-                .type_map_insert::<CommandCounter>(HashMap::default())
-                .type_map_insert::<Player>(HashMap::default())
-                .await.expect("Err creating client");
-        {
-            let mut data = client.data.write().await;
-            data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
-        }
-
-        if let Err(why) = client.start().await {
-            println!("Client error: {:?}", why);
+            if let Err(why) = client.start().await {
+                println!("Client error: {:?}", why);
+            }
+        }else{
+            bot_utils::write_example_config();
         }
     }else{
         bot_utils::write_example_credentials();

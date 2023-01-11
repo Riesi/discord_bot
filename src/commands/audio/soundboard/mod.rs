@@ -3,7 +3,7 @@ use serenity::framework::standard::{Args, CommandResult};
 use serenity::framework::standard::macros::{command, group};
 use serenity::model::channel::Message;
 
-use crate::bot_utils::check_msg;
+use crate::bot_utils::*;
 
 #[group]
 //#[summary = "Soundboard commands"]
@@ -12,6 +12,7 @@ pub struct Soundboard;
 
 #[command]
 #[only_in(guilds)]
+#[checks(verify_user)]
 pub async fn sb(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let path = match args.single::<String>() {
         Ok(path) => path,

@@ -3,7 +3,7 @@ use serenity::framework::standard::{Args, CommandResult};
 use serenity::framework::standard::macros::{command, group};
 use serenity::model::channel::Message;
 
-use crate::bot_utils::check_msg;
+use crate::bot_utils::*;
 use crate::commands::audio::Player;
 
 #[group]
@@ -13,6 +13,7 @@ pub struct Music;
 
 #[command]
 #[only_in(guilds)]
+#[checks(verify_user)]
 pub async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let url = match args.single::<String>() {
         Ok(url) => url,
@@ -63,6 +64,7 @@ pub async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult
 
 #[command]
 #[only_in(guilds)]
+#[checks(verify_user)]
 pub async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;
@@ -88,6 +90,7 @@ pub async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 #[only_in(guilds)]
+#[checks(verify_user)]
 pub async fn pause(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;
@@ -105,6 +108,7 @@ pub async fn pause(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 #[only_in(guilds)]
+#[checks(verify_user)]
 pub async fn resume(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;

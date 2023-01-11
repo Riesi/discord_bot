@@ -7,7 +7,7 @@ use serenity::framework::standard::{CommandResult};
 use serenity::framework::standard::macros::{command, group};
 use serenity::model::channel::Message;
 
-use crate::bot_utils::check_msg;
+use crate::bot_utils::*;
 
 #[group]
 //#[summary = "Audio commands"]
@@ -24,6 +24,7 @@ impl TypeMapKey for Player {
 
 #[command]
 #[only_in(guilds)]
+#[checks(verify_moderator)]
 pub async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;
@@ -55,9 +56,7 @@ pub async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-#[command]
-#[only_in(guilds)]
-pub async fn join(ctx: &Context, msg: &Message) -> CommandResult {
+pub async fn join_channel(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;
 
@@ -84,6 +83,14 @@ pub async fn join(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 #[only_in(guilds)]
+#[checks(verify_user)]
+pub async fn join(ctx: &Context, msg: &Message) -> CommandResult {
+    join_channel(ctx, msg).await
+}
+
+#[command]
+#[only_in(guilds)]
+#[checks(verify_user)]
 pub async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;
@@ -107,6 +114,7 @@ pub async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 #[only_in(guilds)]
+#[checks(verify_moderator)]
 pub async fn mute(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;
@@ -142,6 +150,7 @@ pub async fn mute(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 #[only_in(guilds)]
+#[checks(verify_moderator)]
 pub async fn undeafen(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;
@@ -165,6 +174,7 @@ pub async fn undeafen(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 #[only_in(guilds)]
+#[checks(verify_moderator)]
 pub async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;

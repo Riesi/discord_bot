@@ -3,6 +3,8 @@ use serenity::framework::standard::{Args, CommandResult};
 use serenity::framework::standard::macros::{command, group};
 use serenity::model::channel::{Channel, Message};
 
+use crate::bot_utils::*;
+
 #[group]
 #[owners_only]
 // Limit all commands to be guild-restricted.
@@ -13,6 +15,7 @@ use serenity::model::channel::{Channel, Message};
 pub struct Owner;
 
 #[command]
+#[checks(verify_owner)]
 pub async fn slow_mode(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let say_content = if let Ok(slow_mode_rate_seconds) = args.single::<u64>() {
         if let Err(why) =

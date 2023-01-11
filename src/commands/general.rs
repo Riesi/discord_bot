@@ -7,9 +7,10 @@ use serenity::model::channel::Message;
 use serenity::prelude::TypeMapKey;
 use tokio::sync::Mutex;
 
+use crate::bot_utils::*;
 
 #[group]
-#[commands(latency)]
+#[commands(latency,whoami)]
 pub struct General;
 
 pub struct ShardManagerContainer;
@@ -18,6 +19,7 @@ impl TypeMapKey for ShardManagerContainer {
 }
 
 #[command]
+#[checks(verify_user)]
 pub async fn latency(ctx: &Context, msg: &Message) -> CommandResult {
     let data = ctx.data.read().await;
 
@@ -44,5 +46,12 @@ pub async fn latency(ctx: &Context, msg: &Message) -> CommandResult {
 
     msg.reply(ctx, &format!("The shard latency is {:?}", runner.latency)).await?;
 
+    Ok(())
+}
+
+#[command]
+#[checks(verify_user)]
+pub async fn whoami(ctx: &Context, msg: &Message) -> CommandResult {
+    msg.reply(ctx, &format!("You are {:?}", user_permission(ctx, msg).await)).await.expect("User has no permission?");
     Ok(())
 }

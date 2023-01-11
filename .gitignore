@@ -1,5 +1,6 @@
 /.idea
 /target
 /bot_credentials.yml
+/bot_config.yml
 /audiofiles
 /playlists

@@ -1,10 +1,11 @@
 use serenity::client::Context;
 use serenity::framework::standard::{Args, CommandResult};
 use serenity::framework::standard::macros::{command, group};
+use serenity::futures::TryFutureExt;
 use serenity::model::channel::Message;
 
 use crate::bot_utils::*;
-use crate::commands::audio::Player;
+use crate::commands::audio::{get_volume, Player};
 
 #[group]
 //#[summary = "Music commands"]
@@ -49,11 +50,18 @@ pub async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult
                 return Ok(());
             },
         };
-        let track_handler = handler.play_source(source);
+
+        let volume = get_volume(&ctx, guild_id).await;
+        let (track, track_handler) = songbird::create_player(source);
+
         let mut data = ctx.data.write().await;
         let players = data.get_mut::<Player>().expect("Expected Player in TypeMap.");
-        let handle_map = players.insert(guild_id.to_string(),track_handler);
 
+        track_handler.set_volume((volume as f32)/100f32).expect("Can not set volume!");
+        if let Some(handle_map) = players.insert(guild_id,track_handler){
+            handle_map.stop().expect("Could not stop previews track!");
+        }
+        handler.play(track);
         check_msg(msg.channel_id.say(&ctx.http, "Playing song").await);
     } else {
         check_msg(msg.channel_id.say(&ctx.http, "Not in a voice channel to play in").await);
@@ -75,7 +83,7 @@ pub async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
     if let Some(handler_lock) = manager.get(guild_id) {
         let mut data = ctx.data.write().await;
         let players = data.get_mut::<Player>().expect("Expected Player in TypeMap.");
-        if let Some(track_handler) = players.remove(&guild_id.to_string()){
+        if let Some(track_handler) = players.remove(&guild_id){
             track_handler.stop().expect("Can not stop!");
             check_msg(msg.channel_id.say(&ctx.http, "Stopping song").await);
         }else{
@@ -97,7 +105,7 @@ pub async fn pause(ctx: &Context, msg: &Message) -> CommandResult {
 
     let data = ctx.data.read().await;
     let players = data.get::<Player>().expect("Expected Player in TypeMap.");
-    if let Some(track_handler) = players.get(&guild_id.to_string()){
+    if let Some(track_handler) = players.get(&guild_id){
         track_handler.pause().expect("Can not pause!");
     }else{
         check_msg(msg.channel_id.say(&ctx.http, "No song to pause").await);
@@ -115,7 +123,7 @@ pub async fn resume(ctx: &Context, msg: &Message) -> CommandResult {
 
     let data = ctx.data.read().await;
     let players = data.get::<Player>().expect("Expected Player in TypeMap.");
-    if let Some(track_handler) = players.get(&guild_id.to_string()){
+    if let Some(track_handler) = players.get(&guild_id){
         track_handler.play().expect("Can not resume!");
     }else{
         check_msg(msg.channel_id.say(&ctx.http, "No song to resume").await);

@@ -3,15 +3,16 @@ use songbird::tracks::TrackHandle;
 
 use serenity::client::Context;
 use serenity::prelude::TypeMapKey;
-use serenity::framework::standard::{CommandResult};
+use serenity::framework::standard::{Args, CommandResult};
 use serenity::framework::standard::macros::{command, group};
 use serenity::model::channel::Message;
+use serenity::model::id::GuildId;
 
 use crate::bot_utils::*;
 
 #[group]
 //#[summary = "Audio commands"]
-#[commands(deafen, join, leave, mute, undeafen, unmute)]
+#[commands(deafen, join, leave, mute, undeafen, unmute, set_volume)]
 pub struct Audio;
 
 pub mod music;
@@ -19,7 +20,7 @@ pub mod soundboard;
 
 pub struct Player;
 impl TypeMapKey for Player {
-    type Value = HashMap<String, TrackHandle>;
+    type Value = HashMap<GuildId, TrackHandle>;
 }
 
 #[command]
@@ -192,6 +193,56 @@ pub async fn unmute(ctx: &Context, msg: &Message) -> CommandResult {
     } else {
         check_msg(msg.channel_id.say(&ctx.http, "Not in a voice channel to unmute in").await);
     }
+
+    Ok(())
+}
+
+async fn get_volume(ctx: &Context, guild: GuildId) -> u8{
+    let data = ctx.data.write().await;
+
+    let bot_config = match data.get::<BotConfig>() {
+        Some(v) => v,
+        None => {
+            return 10;
+        },
+    };
+
+    let mut bot_config = bot_config.write().await;
+    bot_config.get_guild_volume(guild)
+}
+
+#[command]
+#[only_in(guilds)]
+#[description("Sets the volume of the bot")]
+#[usage("Values from 10..100 are allowed.")]
+#[checks(verify_moderator)]
+pub async fn set_volume(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let data = ctx.data.write().await;
+
+    let bot_config = match data.get::<BotConfig>() {
+        Some(v) => v,
+        None => {
+            msg.reply(ctx, "There was a problem getting the bot config!").await.unwrap();
+            return Ok(());
+        },
+    };
+    let mut bot_config = bot_config.write().await;
+
+    let volume = match args.single::<u8>() {
+        Ok(vol) => vol,
+        Err(_) => {
+            check_msg(msg.channel_id.say(&ctx.http, "No volume provided!").await);
+            return Ok(());
+        },
+    };
+    if let Some(guild) = msg.guild_id{
+        bot_config.set_guild_volume(guild, volume);
+        let players = data.get::<Player>().expect("Expected Player in TypeMap.");
+        if let Some(track_handler) = players.get(&guild){
+            track_handler.set_volume((volume as f32)/100f32).expect("Can not set volume!");
+        }
+    }
+    write_config(&bot_config).expect("Config could not be written!");
 
     Ok(())
 }

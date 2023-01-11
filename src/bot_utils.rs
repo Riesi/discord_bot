@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::error;
 use std::io::Write;
-use std::sync::Arc;
+use std::sync::{Arc};
 use serde_yaml;
 use serde::{Deserialize, Serialize};
 use serenity::client::Context;
@@ -10,7 +10,7 @@ use serenity::framework::standard::Reason;
 use serenity::model::channel::Message;
 use serenity::model::id::{GuildId, RoleId, UserId};
 use serenity::prelude::{TypeMapKey};
-use tokio::sync::{RwLock};
+use tokio::sync::{RwLock, RwLockWriteGuard};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Credentials {
@@ -97,6 +97,20 @@ impl ConfigStruct{
             server.insert_role_permission(role, perm);
         }
     }
+
+    pub fn set_guild_volume(&mut self, guild: GuildId, volume: u8){
+        if let Some(server) = self.server_cfgs.get_mut(&guild) {
+            server.set_volume(volume);
+        }
+    }
+
+    pub fn get_guild_volume(&mut self, guild: GuildId) -> u8 {
+        if let Some(server) = self.server_cfgs.get_mut(&guild) {
+            server.volume
+        } else {
+            10
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -126,7 +140,7 @@ impl ServerAudioStruct{
         }
     }
     pub fn set_volume(&mut self, volume: u8){
-        self.volume = volume.clamp( 0, 100);
+        self.volume = volume.clamp( 10, 100);
     }
 }
 

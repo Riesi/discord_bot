@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::error;
+use std::io::Write;
 use std::sync::Arc;
 use serde_yaml;
 use serde::{Deserialize, Serialize};
@@ -32,7 +33,7 @@ pub enum BotModes{
     All,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum BotPermission {
     Owner,
     Admin,
@@ -40,6 +41,7 @@ pub enum BotPermission {
     User,
     None,
 }
+
 impl BotPermission {
     fn level(&self) -> u8{
         match self {
@@ -63,7 +65,7 @@ impl TypeMapKey for BotConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ConfigStruct {
+pub struct ConfigStruct{
     owner_id: UserId,
     prefix: char,
     auto_reconnect: bool,
@@ -83,6 +85,19 @@ impl Default for ConfigStruct{
         }
     }
 }
+impl ConfigStruct{
+    pub fn init_server(&mut self, guild: GuildId){
+        if !self.server_cfgs.contains_key(&guild){
+            self.server_cfgs.insert(guild, ServerAudioStruct::default());
+        }
+    }
+
+    pub fn insert_role_guild(&mut self, guild: GuildId, role: RoleId, perm: BotPermission){
+        if let Some(server) = self.server_cfgs.get_mut(&guild) {
+            server.insert_role_permission(role, perm);
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ServerAudioStruct {
@@ -99,6 +114,19 @@ impl Default for ServerAudioStruct{
             user_default: false,
             role_permission: HashMap::default(),
         }
+    }
+}
+
+impl ServerAudioStruct{
+    pub fn insert_role_permission(&mut self, role: RoleId, perm: BotPermission){
+        if perm != BotPermission::None {
+            self.role_permission.insert(role, perm);
+        }else{
+            self.role_permission.remove(&role);
+        }
+    }
+    pub fn set_volume(&mut self, volume: u8){
+        self.volume = volume.clamp( 0, 100);
     }
 }
 
@@ -130,6 +158,20 @@ pub fn write_example_config(){
 pub fn read_config() -> Result<ConfigStruct, Box<dyn error::Error>>{
     let f = std::fs::File::open("./bot_config.yml")?;
     Ok::<ConfigStruct, _>(serde_yaml::from_reader(f)?)
+}
+
+pub fn write_config(cfg: &ConfigStruct) -> serde_yaml::Result<()>{
+    {
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open("bot_config.yml")
+            .expect("Couldn't open file.");
+        serde_yaml::to_writer(&f, cfg)?;
+        f.flush().expect("Failed to flush cfg!");
+    }
+    Ok(())
 }
 
 /// Checks that a message successfully sent; if not, then logs why to stdout.

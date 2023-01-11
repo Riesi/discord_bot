@@ -39,10 +39,10 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     if let Ok(cred) = bot_utils::read_credentials(){
-        if let Ok(cfg) = bot_utils::read_config(){
+        if let Ok(mut cfg) = bot_utils::read_config(){
             let http = Http::new(&cred.token);
             // We will fetch your bot's owners and id
-            let (owners, bot_id) = match http.get_current_application_info().await {
+            let (owners, bot_id, bot_guilds) = match http.get_current_application_info().await {
                 Ok(info) => {
                     let mut owners = HashSet::new();
                     if let Some(team) = info.team {
@@ -50,13 +50,25 @@ async fn main() {
                     } else {
                         owners.insert(info.owner.id);
                     }
+
                     match http.get_current_user().await {
-                        Ok(bot_id) => (owners, bot_id.id),
+                        Ok(bot_id) => {
+                            let bot_guilds = bot_id.guilds(http).await
+                                                                 .unwrap_or(Vec::default());
+                            (owners, bot_id.id, bot_guilds)
+                        },
                         Err(why) => panic!("Could not access the bot id: {:?}", why),
                     }
                 },
                 Err(why) => panic!("Could not access application info: {:?}", why),
             };
+
+            for guild in bot_guilds{
+                cfg.init_server(guild.id);
+            }
+
+            println!("Config {:#?}", cfg);
+            bot_utils::write_config(&cfg).expect("Config could not be written!");
 
             let framework = StandardFramework::new()
                 .configure(|c| c

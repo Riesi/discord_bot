@@ -91,6 +91,7 @@ async fn main() {
                 .group(&commands::latex::LATEX_GROUP)
                 .group(&commands::audio::AUDIO_GROUP)
                 .group(&commands::audio::music::MUSIC_GROUP)
+                .group(&commands::moderation::MODERATION_GROUP)
                 .group(&commands::audio::soundboard::SOUNDBOARD_GROUP)
                 .group(&commands::owner::OWNER_GROUP);
 

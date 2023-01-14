@@ -2,8 +2,6 @@ use serenity::client::Context;
 use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::channel::Message;
 use serenity::framework::standard::macros::{command, group};
-use serenity::model::id::{RoleId};
-use crate::bot_utils;
 use crate::bot_utils::*;
 
 #[group]
@@ -30,7 +28,7 @@ async fn make_perm(ctx: &Context, msg: &Message, mut args: Args, perm: BotPermis
         },
     };
     if let Some(guild) = msg.guild_id{
-        bot_config.insert_role_guild( guild, choosen_id.into(), perm);
+        bot_config.insert_entity_guild( guild, choosen_id, perm);
     }
     write_config(&bot_config).expect("Config could not be written!");
     Ok(())

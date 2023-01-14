@@ -8,9 +8,11 @@ use serenity::client::Context;
 use serenity::framework::standard::macros::check;
 use serenity::framework::standard::Reason;
 use serenity::model::channel::Message;
-use serenity::model::id::{GuildId, RoleId, UserId};
+use serenity::model::id::{GuildId, UserId};
 use serenity::prelude::{TypeMapKey};
 use tokio::sync::{RwLock};
+
+use crate::entity_id::{EntityId};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Credentials {
@@ -42,6 +44,7 @@ pub enum BotPermission {
     None,
 }
 
+#[allow(unreachable_patterns)]
 impl BotPermission {
     fn level(&self) -> u8{
         match self {
@@ -92,9 +95,9 @@ impl ConfigStruct{
         }
     }
 
-    pub fn insert_role_guild(&mut self, guild: GuildId, role: RoleId, perm: BotPermission){
+    pub fn insert_entity_guild(&mut self, guild: GuildId, entity: impl Into<EntityId>, perm: BotPermission){
         if let Some(server) = self.server_cfgs.get_mut(&guild) {
-            server.insert_role_permission(role, perm);
+            server.insert_entity_permission(entity, perm);
         }
     }
 
@@ -118,7 +121,7 @@ pub struct ServerAudioStruct {
     volume: u8,
     auto_playlist: bool,
     user_default: bool,
-    role_permission: HashMap<RoleId, BotPermission>,
+    entity_permission: HashMap<EntityId, BotPermission>,
 }
 impl Default for ServerAudioStruct{
     fn default() -> Self {
@@ -126,17 +129,17 @@ impl Default for ServerAudioStruct{
             volume: 80,
             auto_playlist: false,
             user_default: false,
-            role_permission: HashMap::default(),
+            entity_permission: HashMap::default(),
         }
     }
 }
 
 impl ServerAudioStruct{
-    pub fn insert_role_permission(&mut self, role: RoleId, perm: BotPermission){
+    pub fn insert_entity_permission(&mut self, entity: impl Into<EntityId>, perm: BotPermission){
         if perm != BotPermission::None {
-            self.role_permission.insert(role, perm);
+            self.entity_permission.insert(entity.into(), perm);
         }else{
-            self.role_permission.remove(&role);
+            self.entity_permission.remove(&entity.into());
         }
     }
     pub fn set_volume(&mut self, volume: u8){
@@ -195,9 +198,9 @@ pub fn check_msg(result: serenity::Result<Message>) {
     }
 }
 
-pub async fn user_permission(ctx: &Context, msg: &Message, user_id: UserId) -> Result<BotPermission, Reason>{
+pub async fn user_permission(ctx: &Context, msg: &Message, entity_id: impl Into<EntityId>) -> Result<BotPermission, Reason>{
     let data = ctx.data.read().await;
-
+    let entity_id = entity_id.into();
     let bot_config = match data.get::<BotConfig>() {
         Some(v) => v,
         None => {
@@ -208,7 +211,7 @@ pub async fn user_permission(ctx: &Context, msg: &Message, user_id: UserId) -> R
 
     let owner_id = bot_config.owner_id;
 
-    if user_id == owner_id{
+    if entity_id == owner_id{
         return Ok(BotPermission::Owner);
     }
 
@@ -220,10 +223,18 @@ pub async fn user_permission(ctx: &Context, msg: &Message, user_id: UserId) -> R
             if guild_cfg.user_default{
                 ret_perm = BotPermission::User;
             }
-            // check if user has a role with sufficient permission
-            if let Ok(mem) = guild.member(ctx, user_id).await{
-                for role in &mem.roles{
-                    if let Some(perm) = guild_cfg.role_permission.get(&role){
+
+            // check if user has a permission assigned
+            if let Some(perm) = guild_cfg.entity_permission.get(&entity_id){
+                if perm.dominates(&ret_perm){
+                    ret_perm = *perm;
+                }
+            }
+
+            // check if user has a role with sufficient permission assigned
+            if let Ok(mem) = guild.member(ctx, entity_id).await{
+                for role in mem.roles{
+                    if let Some(perm) = guild_cfg.entity_permission.get(&role.into()){ // TODO fix when "impl trait aliases" are stable
                         if perm.dominates(&ret_perm){
                             ret_perm = *perm;
                         }

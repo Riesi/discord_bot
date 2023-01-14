@@ -16,6 +16,7 @@ use songbird::SerenityInit;
 mod bot_utils;
 mod latex_utils;
 mod commands;
+mod entity_id;
 
 use commands::audio::Player;
 use crate::bot_utils::BotConfig;

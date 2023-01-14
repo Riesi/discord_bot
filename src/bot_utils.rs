@@ -114,6 +114,34 @@ impl ConfigStruct{
             10
         }
     }
+
+    pub fn set_guild_user_default(&mut self, guild: GuildId, setting: bool){
+        if let Some(server) = self.server_cfgs.get_mut(&guild) {
+            server.user_default = setting;
+        }
+    }
+
+    pub fn get_guild_user_default(&mut self, guild: GuildId) -> bool {
+        if let Some(server) = self.server_cfgs.get_mut(&guild) {
+            server.user_default
+        } else {
+            false
+        }
+    }
+
+    pub fn set_guild_auto_playlist(&mut self, guild: GuildId, setting: bool){
+        if let Some(server) = self.server_cfgs.get_mut(&guild) {
+            server.auto_playlist = setting;
+        }
+    }
+
+    pub fn get_guild_auto_playlist(&mut self, guild: GuildId) -> bool {
+        if let Some(server) = self.server_cfgs.get_mut(&guild) {
+            server.auto_playlist
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

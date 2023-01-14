@@ -10,7 +10,7 @@ use serenity::framework::standard::Reason;
 use serenity::model::channel::Message;
 use serenity::model::id::{GuildId, RoleId, UserId};
 use serenity::prelude::{TypeMapKey};
-use tokio::sync::{RwLock, RwLockWriteGuard};
+use tokio::sync::{RwLock};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Credentials {
@@ -195,36 +195,33 @@ pub fn check_msg(result: serenity::Result<Message>) {
     }
 }
 
-pub async fn user_permission(ctx: &Context, msg: &Message) -> Result<BotPermission, Reason>{
+pub async fn user_permission(ctx: &Context, msg: &Message, user_id: UserId) -> Result<BotPermission, Reason>{
     let data = ctx.data.read().await;
 
     let bot_config = match data.get::<BotConfig>() {
         Some(v) => v,
         None => {
-            msg.reply(ctx, "There was a problem getting the bot config").await.unwrap();
             return Err(Reason::User("Bot config failed!".to_string()));
         },
     };
     let bot_config = bot_config.read().await;
 
     let owner_id = bot_config.owner_id;
-    let author_id = msg.author.id;
 
-    if author_id == owner_id{
+    if user_id == owner_id{
         return Ok(BotPermission::Owner);
     }
 
-
     let mut ret_perm = BotPermission::None;
 
-    if let Some(guild_id) = msg.guild_id {
-        if let Some(guild_cfg) = bot_config.server_cfgs.get(&guild_id){
+    if let Some(guild) = msg.guild(ctx){
+        if let Some(guild_cfg) = bot_config.server_cfgs.get(&guild.id){
             // check if all users default to User permission
             if guild_cfg.user_default{
                 ret_perm = BotPermission::User;
             }
             // check if user has a role with sufficient permission
-            if let Some(mem) = &msg.member{
+            if let Ok(mem) = guild.member(ctx, user_id).await{
                 for role in &mem.roles{
                     if let Some(perm) = guild_cfg.role_permission.get(&role){
                         if perm.dominates(&ret_perm){
@@ -243,7 +240,7 @@ pub async fn user_permission(ctx: &Context, msg: &Message) -> Result<BotPermissi
 
 async fn verify_permission(ctx: &Context, msg: &Message, command_permission: BotPermission) -> Result<(), Reason>{
 
-    if user_permission(ctx, msg).await?.dominates(&command_permission){
+    if user_permission(ctx, msg, msg.author.id).await?.dominates(&command_permission){
         return Ok(());
     }
 

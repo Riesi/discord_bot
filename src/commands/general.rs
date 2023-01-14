@@ -51,7 +51,6 @@ pub async fn latency(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
-#[checks(verify_user)]
 pub async fn whoami(ctx: &Context, msg: &Message) -> CommandResult {
     msg.reply(ctx, &format!("You are {:?}", user_permission(ctx, msg, msg.author.id).await)).await.expect("User has no permission?");
     Ok(())

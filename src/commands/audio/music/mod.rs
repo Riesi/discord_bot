@@ -1,7 +1,6 @@
 use serenity::client::Context;
 use serenity::framework::standard::{Args, CommandResult};
 use serenity::framework::standard::macros::{command, group};
-use serenity::futures::TryFutureExt;
 use serenity::model::channel::Message;
 
 use crate::bot_utils::*;

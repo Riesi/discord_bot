@@ -84,6 +84,7 @@ pub async fn join_channel(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 #[only_in(guilds)]
+#[aliases(connect)]
 #[checks(verify_user)]
 pub async fn join(ctx: &Context, msg: &Message) -> CommandResult {
     join_channel(ctx, msg).await
@@ -91,6 +92,7 @@ pub async fn join(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 #[only_in(guilds)]
+#[aliases(disconnect)]
 #[checks(verify_user)]
 pub async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();

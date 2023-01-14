@@ -76,20 +76,13 @@ pub async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;
 
-    let manager = songbird::get(ctx).await
-        .expect("Songbird Voice client placed in at initialisation.").clone();
-
-    if let Some(handler_lock) = manager.get(guild_id) {
-        let mut data = ctx.data.write().await;
-        let players = data.get_mut::<Player>().expect("Expected Player in TypeMap.");
-        if let Some(track_handler) = players.remove(&guild_id){
-            track_handler.stop().expect("Can not stop!");
-            check_msg(msg.channel_id.say(&ctx.http, "Stopping song").await);
-        }else{
-            check_msg(msg.channel_id.say(&ctx.http, "No song to stop").await);
-        }
-    } else {
-        check_msg(msg.channel_id.say(&ctx.http, "Not in a voice channel to stop").await);
+    let mut data = ctx.data.write().await;
+    let players = data.get_mut::<Player>().expect("Expected Player in TypeMap.");
+    if let Some(track_handler) = players.remove(&guild_id){
+        track_handler.stop().expect("Can not stop!");
+        check_msg(msg.channel_id.say(&ctx.http, "Stopping song").await);
+    }else{
+        check_msg(msg.channel_id.say(&ctx.http, "No song to stop").await);
     }
 
     Ok(())
